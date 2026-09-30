@@ -3,28 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
- 
+
 <title>Microphone Test</title>
- 
 <style>
 body {
 font-family: Arial, sans-serif;
 text-align: center;
 padding: 30px;
 }
- 
 button {
 padding: 12px 20px;
 font-size: 18px;
 cursor: pointer;
 }
- 
 #soundLevel {
 font-size: 48px;
 font-weight: bold;
 margin: 30px 0;
 }
- 
 .meter {
 width: 100%;
 max-width: 400px;
@@ -34,133 +30,116 @@ margin: 20px auto;
 border-radius: 10px;
 overflow: hidden;
 }
- 
 #meterBar {
 width: 0%;
 height: 100%;
 background-color: green;
 }
- 
 #status {
 margin-top: 20px;
 }
 </style>
 </head>
- 
 <body>
- 
 <h1>Study Environment Sensor</h1>
- 
 <p>Microphone test</p>
- 
 <button id="startButton">Start microphone</button>
- 
 <h2>Sound intensity</h2>
- 
 <div id="soundLevel">0 %</div>
- 
 <div class="meter">
 <div id="meterBar"></div>
 </div>
- 
+
 <p id="status">Microphone not started</p>
- 
- 
+
 <script>
- 
+const THINGSPEAK_WRITE_KEY = "OMA_API_AVAIN";
 const startButton = document.getElementById("startButton");
 const soundLevel = document.getElementById("soundLevel");
 const meterBar = document.getElementById("meterBar");
 const statusText = document.getElementById("status");
- 
- 
+let currentSoundLevel = 0;
+
 startButton.addEventListener("click", async function() {
- 
+
 try {
- 
+
 // Ask permission to use the microphone
 const stream = await navigator.mediaDevices.getUserMedia({
 audio: true
 });
- 
+
 statusText.textContent = "Microphone active";
- 
 // Create Web Audio API context
 const audioContext = new AudioContext();
- 
 // Use microphone as audio source
 const source =
 audioContext.createMediaStreamSource(stream);
- 
 // Create analyser
 const analyser = audioContext.createAnalyser();
- 
 analyser.fftSize = 256;
- 
 source.connect(analyser);
- 
 const dataArray =
 new Uint8Array(analyser.frequencyBinCount);
- 
- 
+
 function measureSound() {
- 
 analyser.getByteFrequencyData(dataArray);
- 
 let total = 0;
- 
 for (let i = 0; i < dataArray.length; i++) {
 total += dataArray[i];
 }
- 
 // Calculate average signal level
 const average = total / dataArray.length;
- 
 // Convert approximately to 0-100 scale
 let level = Math.round((average / 128) * 100);
- 
 if (level > 100) {
 level = 100;
 }
- 
+currentSoundLevel = level;
 soundLevel.textContent = level + " %";
- 
 meterBar.style.width = level + "%";
- 
- 
+
 // Change bar colour based on sound level
 if (level < 30) {
- 
 meterBar.style.backgroundColor = "green";
- 
 } else if (level < 60) {
- 
 meterBar.style.backgroundColor = "orange";
- 
 } else {
- 
 meterBar.style.backgroundColor = "red";
- 
 }
- 
- 
+
 requestAnimationFrame(measureSound);
 }
- 
- 
+
 measureSound();
- 
+setInterval(sendToThingSpeak, 20000);
 } catch (error) {
- 
 statusText.textContent =
 "Microphone error: " + error.message;
- 
 console.error(error);
 }
- 
 });
- 
+
+async function sendToThingSpeak() {
+    try {
+        const url =
+            `https://api.thingspeak.com/update?api_key=${THINGSPEAK_WRITE_KEY}&field1=${currentSoundLevel}`;
+
+        const response = await fetch(url);
+        const result = await response.text();
+
+        console.log(
+            "Sent to ThingSpeak:",
+            currentSoundLevel,
+            "Entry ID:",
+            result
+        );
+
+} catch (error) {
+    console.error("ThingSpeak error:", error);
+}
+}
+
 </script>
- 
 </body>
 </html>
